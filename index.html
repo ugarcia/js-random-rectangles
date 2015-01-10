@@ -11,6 +11,7 @@ var	nRectangles = 3,
 	minRectDim = 50,
 	maxRectDim = 100;
 
+
 /*
 Specifications:
 
@@ -55,6 +56,536 @@ Further notes:
 */
 
 /* Please write your JavaScript code here */
+
+(function(){
+
+	// Container object.
+	var container = {
+		el: document.createElement('div'),
+		styles: {
+		       	backgroundColor: getRandomCssColor(),
+			width: containerWidth + "px",
+			height: containerHeight + "px",
+			position: 'relative'
+		},
+		dims: {
+			x: 0,
+			y: 0,
+			w: containerWidth,
+			h: containerHeight
+		}		
+	       },
+
+	       // Array to hold the rectangles.
+	       rectangles = [],
+
+	       // Hover time to change rect position.
+	       hoverTime = 3000,
+
+	       // Hover timeout object.
+	       hoverTimeout,
+
+	       // Mouse position reference.
+	       mouse;
+
+	// Apply defined styles to container element.
+	applyStyles(container);
+
+	// Loop over and create 'n' rectangles.
+	for (var i = 0; i < nRectangles; i++) {
+
+		// Add to array a new rectangle object.
+		rectangles[i] = createRectangle();
+	}
+
+	// Listeners for mouse position.
+	if (document.addEventListener) {
+
+		// Standard.
+		document.addEventListener("mousemove", mouseMove);
+
+	} else if (document.attachEvent) {
+
+		// IE<9
+	    	document.attachEvent("onmousemove", mouseMove);
+	}
+
+	// Wait for body to load
+	window.onload = function() {
+
+		// Add container as body child.
+		document.body.appendChild(container.el);
+
+	};
+	
+
+
+	/**
+	 * @function createRectangle(old, avoidMouse)
+	 *
+	 * Creates and returns a rectangle.
+	 * Dimensions and color can be reused.
+	 * Initial position attempt is always random.
+	 *
+	 * @param {object} old The old styles to use.
+	 * @param {boolean} avoidMouse Flag to indicate mouse avoidance.
+	 *
+	 * @return {object} The positioned or null rectangle.
+	 */
+	function createRectangle(old, avoidMouse) {
+
+		// Normalize parameter
+		old = old || {};
+
+		// Get the width from old one or a random one.
+		var width = old.width || getRandomSide(minRectDim, maxRectDim),
+
+		       // Get the height from old one or a random one.
+		       height = old.height || getRandomSide(minRectDim, maxRectDim),
+
+		       // Get a random point.
+		       point = getTopLeftPoint(width, height, avoidMouse);
+
+		// No possible to fit the rectangle, skip it.
+		if (!point) {
+			return null;
+		}
+
+		// Create rectangle object.
+		var rectangle = {
+			el: document.createElement('div'),
+			styles: {
+			       	backgroundColor: old.backgroundColor || getRandomCssColor(),
+				width: width + "px",
+				height: height + "px",
+				position: "absolute",
+				top: point.y + "px",
+				left: point.x + "px"
+			},
+			dims: {
+				x: point.x,
+				y: point.y,
+				w: width,
+				h: height
+			}
+		};
+
+		// Apply defined styles.
+		applyStyles(rectangle);
+
+		// Apply event for mouse hover.
+		applyEvents(rectangle);
+
+		// Append rectangle to container.
+		container.el.appendChild(rectangle.el);
+
+		// Return the rectangle.
+		return rectangle;	
+	}
+
+
+	/**
+	 * @function applyStyles(entry)
+	 *
+	 * Sets rectangle DOM element styles based on object properties.
+	 *
+	 * @param {object} entry The rectangle.
+	 *
+	 * @return {void}
+	 */
+	function applyStyles(entry) {
+
+		// Loop over object properties.
+		for (var s in entry.styles) {
+
+			// Ensure it's not inherited.
+			if ({}.hasOwnProperty.call(entry.styles, s)) {
+
+				// Apply property to element style.
+				entry.el.style[s] = entry.styles[s];
+			}
+		}
+	}
+
+
+	/**
+	 * @function applyEvents(entry)
+	 *
+	 * Sets rectangle DOM element listeners for mouse.
+	 *
+	 * @param {object} entry The rectangle.
+	 *
+	 * @return {void}
+	 */
+	function applyEvents(entry) {
+
+		// Standard.
+		if (document.addEventListener) {
+
+			// Listener for mouse over.
+			entry.el.addEventListener("mouseover", function(evt) { 
+
+				// Call handler with rectangle object.
+				mouseOverRect(entry);
+			});
+
+			// Listener for mouse out.
+			entry.el.addEventListener("mouseout", mouseOutRect);
+
+		// IE<9
+		} else if (document.attachEvent) {
+
+			// Listener for mouse over.
+			entry.el.attachEvent("onmouseover", function(evt) { 
+
+				// Call handler with rectangle object.
+				mouseOverRect(entry);
+			});
+
+			// Listener for mouse out.
+			entry.el.attachEvent("onmouseout", mouseOutRect);
+		}
+	}
+
+	/**
+	 * @function mouseOverRect(entry)
+	 *
+	 * Event Handler for mouse over a rectangle.
+	 *
+	 * @param {object} entry The rectangle.
+	 *
+	 * @return {void}
+	 */
+	function mouseOverRect(entry) {
+
+		// Generate a new color
+		var color = getRandomCssColor();
+
+		// Change element color on hovering.
+		entry.el.style.backgroundColor = color;
+
+		// Assign it also to rectangle object for later reuse.
+		entry.styles.backgroundColor = color;
+
+		// Create a timeout in order to relocate the rectangle.
+		hoverTimeout = setTimeout(function() {
+
+			// Remove the rectangle from DOM.
+			container.el.removeChild(entry.el);
+
+			// Reference to array index for hovered rectangle.
+			var ref = null;
+
+			// Loop over rectangles.
+			for (var i = 0; !ref && i < nRectangles; i++) {
+
+				// Find if targeted rectangle.
+				if (rectangles[i] == entry) {
+
+					// Get index reference.
+					ref = i;
+				}
+			}
+
+			// Get rectangle properties for reuse.
+			var old = {
+				width: parseInt(entry.styles.width, 10),
+				height: parseInt(entry.styles.height, 10),
+				backgroundColor: entry.styles.backgroundColor
+			}
+
+			// Delete the matched rectangle from collection.
+			delete rectangles[ref];
+
+			// Create a rectangle and use same array index into collection.
+			rectangles[ref] = createRectangle(old, true);
+
+		// Time for the trigger.
+		}, hoverTime);
+	}
+
+
+	/**
+	 * @function mouseOutRect(evt)
+	 *
+	 * Event Handler for mouse out of a rectangle.
+	 *
+	 * @param {object} evt The mouse event.
+	 *
+	 * @return {void}
+	 */
+	function mouseOutRect(evt) {
+
+		// Clear the timeout for relocation.
+		clearTimeout(hoverTimeout);
+	}
+
+
+	/**
+	 * @function mouseMove(evt)
+	 *
+	 * Event Handler for mouse movement.
+	 * Allows to track mouse position in global variable.
+	 *
+	 * @param {object} evt The mouse event.
+	 *
+	 * @return {void}
+	 */
+	function mouseMove(evt) {
+
+		// Update mouse position.
+		mouse = {
+			x: evt.clientX || evt.pageX,
+    			y: evt.clientY || evt.pageY
+    		};
+	}
+
+
+	/**
+	 * @function getRandomSide(min, max)
+	 *
+	 * Generates a random number within a range.
+	 *
+	 * @param {number} min The range min.
+	 * @param {number} max The range max.
+	 *
+	 * @return {number} The random number.
+	 */
+	function getRandomSide(min, max) {
+
+		// Generate the random number.
+		return min + Math.floor((max - min)*Math.random());
+	}
+
+
+	/**
+	 * @function getRandomCssColor()
+	 *
+	 * Generates a random css color.
+	 *
+	 * @return {string} The random css color style.
+	 */
+	function getRandomCssColor() {
+
+		// Randomize rgb colors at once thru reduction.
+		return [256,256,256].reduce(function(css, item) {
+
+			// Append random color to css string.
+	       		return css + Math.floor(item*Math.random()) + ",";
+
+	       	// Finish the string.	
+	       	}, "rgba(") + "1)";
+	}
+
+
+	/**
+	 * @function getTopLeftPoint(w, h, avoidMouse)
+	 *
+	 * Looks for a valid random position for the rectangle.
+	 *
+	 * @param {number} w The rectangle width.
+	 * @param {number} h The rectangle height.
+	 * @param {boolean} avoidMouse Whether to avoid mouse position or not.
+	 *
+	 * @return {object} The generated dimensions.
+	 */
+	function getTopLeftPoint(w, h, avoidMouse) {
+
+		// Define dimensions object.
+		var dims = {
+			x: Math.floor((containerWidth - w)*Math.random()),
+		      	y: Math.floor((containerHeight - h)*Math.random()),
+		      	w: w,
+		      	h: h
+		      }, 
+
+		      // Flag stating if a rect is inside container.
+		      inside,
+
+		      // Flag stating if rect fits into container.
+		      fit,
+
+		      // Flag stating if rect overlaps with any other one.
+		      overlaps,
+
+		      // Counter.
+		      i,
+
+		      // Rectangles collection length reference.
+		      n = rectangles.length,
+
+		      // Initial random vertical position as a limit to reach
+		      // if rect topped after reaching bottom.
+		      refY = dims.y,
+
+		      // Flag stating if a rectangle was topped after reaching bottom. 
+		      topped = false,
+
+		      // Next vertical position for rectangle, set to higher limit.
+		      nextY = container.dims.y + container.dims.h + 1,
+
+		      // Aux variable for rectangles bottom 'y'.
+		      recBottom;
+
+		// Include mouse as rectangle into collection if we need to avoid it.
+		if (avoidMouse) {
+
+			// Define minimal rectangle object.
+			rectangles[nRectangles] = {
+				dims: {
+					x: mouse.x,
+					y: mouse.y,
+					w: 5,
+					h: 5
+				}
+			}
+
+			// Let's update our variable caching array length here.
+			n++;
+		}
+
+		// Loop until we fit the rectangle or we make a full vertical loop
+		// When rectangle reaches bottom (so didin't fit), it resets to top.
+		// After topped, a rectangle can follow the search
+		// until it exceeds the original vertical position.
+		do {
+
+			// Init fit to true.
+			fit = true;
+
+			// Init overlapped to false.
+			overlaps = false;
+
+			// Loop over existing rectangles while we don't overlap.
+			for (i = 0; !overlaps && i < n; i++) {
+
+				// This rectangle was deleted, skip.
+				if (!rectangles[i]) {
+					continue;
+				}
+
+				// Find if the new one overlaps the existing one.
+				overlaps = rectOverlapsRect(rectangles[i].dims, dims);
+
+				// Cache the bottom 'y' position for the existing rectangle.
+				recBottom = rectangles[i].dims.y + rectangles[i].dims.h;
+
+				// Register that position if lower than existing one.
+				// It will be candidate for the next vertical position if reached horizontal limit.
+				nextY = (overlaps && recBottom < nextY) ? recBottom + 1 : nextY;
+			}
+
+			// Check if we got overlapping.
+			if (overlaps) {
+
+				// Pass completely and horizontally thru the collided rectangle.
+				dims.x = rectangles[i-1].dims.x + rectangles[i-1].dims.w + 1;
+
+			// No overlapping.
+			} else {
+
+				// Find if new rectangle is contained in the container.
+				inside = rectContainsRect(container.dims, dims);
+
+				// Check if not contained
+				if (!inside) {
+
+					// If it was topped and exceeds original vertical position.
+					if (topped && dims.y > refY) {
+
+						// Check if we needed to avoid mouse.
+						if (avoidMouse) {
+
+							// Remove mouse small rect from collection.
+							rectangles.pop();
+						}
+
+						// Return null rectangle, it didn't fit.
+						return null;
+					}
+
+					// If not topped yet and reached vertical limit, top up it.
+					if (!topped && (container.dims.y + container.dims.h) < nextY) {
+
+						// Reset vertical position to top.
+						dims.y = 0;
+
+						// Set topped flag.
+						topped = true;
+
+					// Topped or not reached vertical limit.					
+					} else {
+
+						// Set vertical position to calculated next one.
+						dims.y = nextY;
+
+						// Reset next vertical position for next iteration.
+						nextY = container.dims.y + container.dims.h + 1;
+					}
+
+					// Reset horizontal position to start.
+					dims.x = 0;
+				}
+			}
+
+			// Is finally fit?
+			fit = fit && !overlaps && inside;
+			
+		// Iterate while no fit.
+		} while (!fit);
+
+		// Check if we needed to avoid mouse.
+		if (avoidMouse) {
+
+			// Remove mouse small rect from collection.
+			rectangles.pop();
+		}
+
+		// Return fitted dimensions.
+		return dims;
+	}
+
+
+	/**
+	 * @function rectOverlapsRect(rec1, rec2)
+	 *
+	 * Checks if a rectangle overlaps another.
+	 *
+	 * @param {object} rec1 The overlapped rectangle dimensions.
+	 * @param {object} rec2 The overlapping rectangle dimensions.
+	 *
+	 * @return {boolean} Overlaps or not?
+	 */
+	function rectOverlapsRect(rec1, rec2) {
+
+		// Basically it overlaps if it does not have everything outside.
+		return !(rec1.x > rec2.x + rec2.w ||
+			rec1.x + rec1.w < rec2.x || 
+			rec1.y > rec2.y + rec2.h || 
+			rec1.y + rec1.h < rec2.y); 
+	}
+
+
+	/**
+	 * @function rectContainsRect(rec1, rec2)
+	 *
+	 * Checks if a rectangle contains another.
+	 *
+	 * @param {object} rec1 The container rectangle dimensions.
+	 * @param {object} rec2 The contained rectangle dimensions.
+	 *
+	 * @return {boolean} Contained or not?
+	 */
+	function rectContainsRect(rec1, rec2) {
+
+		// Some more mathematics.
+		return rec1.x <= rec2.x &&
+			rec1.x + rec1.w >= rec2.x + rec2.w && 
+			rec1.y <= rec2.y && 
+			rec1.y + rec1.h >= rec2.y + rec2.h; 
+	}
+
+})();
 
 </script>
 <!-- If using a framework, please insert <script src> here -->
